@@ -15,39 +15,38 @@ import servlets.ResourceServlet;
 
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
+import java.io.*;
 import java.lang.management.ManagementFactory;
+import java.net.ServerSocket;
+import java.net.Socket;
 
 /**
  * Created by misha on 06.12.16.
  */
 public class Main {
-    public static void main(String[] args) throws Exception {
-        String portString = "8080";
-        int port = Integer.valueOf(portString);
+    // Выбираем порт вне пределов 1-1024:
+    public static final int PORT = 8080;
 
-        TestResource testResource = new TestResource();
-
-        ResourceServerControllerMBean resourceServerControllerMBean
-                = new ResourceServerController(testResource);
-        MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
-        ObjectName name = new ObjectName("Admin:type=ResourceServerController");
-        mbs.registerMBean(resourceServerControllerMBean, name);
-
-        Server server = new Server(port);
-        ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);
-        context.addServlet(new ServletHolder(new ResourceServlet(resourceServerControllerMBean)), ResourceServlet.PAGE_URL);
-        ResourceHandler resource_handler = new ResourceHandler();
-        resource_handler.setDirectoriesListed(true);
-        resource_handler.setResourceBase("static");
-
-        HandlerList handlers = new HandlerList();
-        handlers.setHandlers(new Handler[]{resource_handler, context});
-        server.setHandler(handlers);
-
-        server.start();
-        System.out.println("Server started");
-
-        server.join();
-
+    public static void main(String[] args) throws IOException {
+        try (ServerSocket s = new ServerSocket(PORT)){
+            System.out.println("Started: " + s);
+          // Блокирует до тех пор, пока не возникнет соединение:
+        try (Socket socket = s.accept()){
+                System.out.println("Connection accepted: " + socket);
+                BufferedReader in = new BufferedReader(new InputStreamReader(
+                        socket.getInputStream()));
+                // Вывод автоматически выталкивается из буфера PrintWriter'ом
+                PrintWriter out = new PrintWriter(new BufferedWriter(
+                        new OutputStreamWriter(socket.getOutputStream())), true);
+                while (true) {
+                    String str = in.readLine();
+                    if (str.equals("END"))
+                        break;
+                    System.out.println("Echoing: " + str);
+                    out.println(str);
+                }
+                // Всегда закрываем два сокета...
+            }
+        }
     }
 }
